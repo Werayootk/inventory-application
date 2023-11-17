@@ -6,7 +6,7 @@ const Token = require("../models/token.model");
 const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail");
 const db = require("../models");
-const { User } = require("../models/userModel")
+const { User } = require("../models/user.model")
 const { Op } = require("sequelize");
 
 // Generate Token
