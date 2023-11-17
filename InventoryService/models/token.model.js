@@ -1,24 +1,24 @@
-const mongoose = require("mongoose");
+module.exports = (sequelize, DataTypes) => {
+  const Token = sequelize.define(
+    "Token",
+    {
+      token: {
+        type: DataTypes.STRING,
+      },
+      expiresAt: {
+        type: DataTypes.DATE
+      }
+    },{
+      timestamps: true
+    }
+  );
 
-const tokenSchema = mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true,
-    ref: "user",
-  },
-  token: {
-    type: String,
-    required: true,
-  },
-  createdAt: {
-    type: Date,
-    required: true,
-  },
-  expiresAt: {
-    type: Date,
-    required: true,
-  },
-});
+  Token.associate = (models) => {
+    Token.belongsTo(models.User, {
+      foreignKey: "userId",
+      allowNull: true
+    });
+  };
 
-const Token = mongoose.model("Token", tokenSchema);
-module.exports = Token;
+  return Token;
+};

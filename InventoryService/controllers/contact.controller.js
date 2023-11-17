@@ -1,10 +1,13 @@
 const asyncHandler = require("express-async-handler");
-const User = require("../models/user.model")
+const db = require("../models");
+const User = require("../models/user.model");
 const sendEmail = require("../utils/sendEmail");
 
 const contactUs = asyncHandler(async (req, res) => {
   const { subject, message } = req.body;
-  const user = await User.findById(req.user._id);
+  const user = await db.User.findOne({
+    where: { id: req.user.id }
+  });
 
   if (!user) {
     res.status(400);

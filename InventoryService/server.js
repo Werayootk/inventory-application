@@ -9,6 +9,7 @@ const contactRoute = require("./routes/contact.route");
 const errorHandler = require("./middleWare/error.middleware");
 const cookieParser = require("cookie-parser");
 const path = require("path");
+const { sequelize } = require("./models")
 
 const app = express();
 
@@ -40,11 +41,8 @@ app.get("/", (req, res) => {
 app.use(errorHandler);
 // Connect to DB and start server
 const PORT = process.env.PORT || 5000;
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Server Running on port ${PORT}`);
-    });
-  })
-  .catch((err) => console.log(err));
+
+// sequelize.sync({ force: true });
+app.listen(PORT, () => {
+  console.log(`Server Running on port ${PORT}`);
+});

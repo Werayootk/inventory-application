@@ -1,10 +1,13 @@
 const asyncHandler = require("express-async-handler");
-const User = require("../models/user.model");
+// const User = require("../models/userModel");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const Token = require("../models/token.model");
 const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail");
+const db = require("../models");
+const { User } = require("../models/userModel")
+const { Op } = require("sequelize");
 
 // Generate Token
 const generateToken = (id) => {
@@ -14,6 +17,9 @@ const generateToken = (id) => {
 // Register User
 const registerUser = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
+
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(password, salt);
 
   // Validation
   if (!name || !email || !password) {
@@ -26,7 +32,11 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   // Check if user email already exists
-  const userExists = await User.findOne({ email });
+  const userExists = await db.User.findOne(
+    {
+      where: { email: email }
+    }
+  );
 
   if (userExists) {
     res.status(400);
@@ -34,14 +44,14 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   // Create new user
-  const user = await User.create({
+  const user = await db.User.create({
     name,
     email,
-    password,
+    password : hashedPassword,
   });
 
   //   Generate Token
-  const token = generateToken(user._id);
+  const token = generateToken(user.id);
   console.log(token);
 
   // Send HTTP-only cookie
@@ -54,9 +64,9 @@ const registerUser = asyncHandler(async (req, res) => {
   });
 
   if (user) {
-    const { _id, name, email, photo, phone, bio } = user;
+    const { id, name, email, photo, phone, bio } = user;
     res.status(201).json({
-      _id,
+      id,
       name,
       email,
       photo,
@@ -81,7 +91,9 @@ const loginUser = asyncHandler(async (req, res) => {
   }
 
   // Check if user exists
-  const user = await User.findOne({ email });
+  const user = await db.User.findOne({
+    where : { email: email }
+  });
 
   if (!user) {
     res.status(400);
@@ -90,9 +102,9 @@ const loginUser = asyncHandler(async (req, res) => {
 
   // User exists, check if password is correct
   const passwordIsCorrect = await bcrypt.compare(password, user.password);
-
+console.log(passwordIsCorrect);
   //   Generate Token
-  const token = generateToken(user._id);
+  const token = generateToken(user.id);
   console.log(token);
   
   if(passwordIsCorrect){
@@ -106,9 +118,9 @@ const loginUser = asyncHandler(async (req, res) => {
   });
 }
   if (user && passwordIsCorrect) {
-    const { _id, name, email, photo, phone, bio } = user;
+    const { id, name, email, photo, phone, bio } = user;
     res.status(200).json({
-      _id,
+      id,
       name,
       email,
       photo,
@@ -136,12 +148,14 @@ const logout = asyncHandler(async (req, res) => {
 
 // Get User Data
 const getUser = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
+  const user = await db.User.findOne({
+    where : { id: req.user.id }
+  });
 
   if (user) {
-    const { _id, name, email, photo, phone, bio } = user;
+    const { id, name, email, photo, phone, bio } = user;
     res.status(200).json({
-      _id,
+      id,
       name,
       email,
       photo,
@@ -170,7 +184,9 @@ const loginStatus = asyncHandler(async (req, res) => {
 
 // Update User
 const updateUser = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
+  const user = await db.User.findOne({
+    where: {id : req.user.id}
+  });
 
   if (user) {
     const { name, email, photo, phone, bio } = user;
@@ -182,7 +198,7 @@ const updateUser = asyncHandler(async (req, res) => {
 
     const updatedUser = await user.save();
     res.status(200).json({
-      _id: updatedUser._id,
+      id: updatedUser.id,
       name: updatedUser.name,
       email: updatedUser.email,
       photo: updatedUser.photo,
@@ -196,7 +212,9 @@ const updateUser = asyncHandler(async (req, res) => {
 });
 
 const changePassword = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
+  const user = await db.User.findOne({
+    where: { id: req.user.id}
+  });
   const { oldPassword, password } = req.body;
 
   if (!user) {
@@ -225,7 +243,9 @@ const changePassword = asyncHandler(async (req, res) => {
 
 const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
-  const user = await User.findOne({ email });
+  const user = await db.User.findOne({ 
+    where : { email : email }
+  });
 
   if (!user) {
     res.status(404);
@@ -233,13 +253,16 @@ const forgotPassword = asyncHandler(async (req, res) => {
   }
 
   // Delete token if it exists in DB
-  let token = await Token.findOne({ userId: user._id });
+  let token = await db.Token.findOne({ 
+    where: {userId: user.id}
+  });
+  
   if (token) {
-    await token.deleteOne();
+    await token.destroy();
   }
 
   // Create Reste Token
-  let resetToken = crypto.randomBytes(32).toString("hex") + user._id;
+  let resetToken = crypto.randomBytes(32).toString("hex") + user.id;
   console.log(resetToken);
 
   // Hash token before saving to DB
@@ -249,12 +272,12 @@ const forgotPassword = asyncHandler(async (req, res) => {
     .digest("hex");
 
   // Save Token to DB
-  await new Token({
-    userId: user._id,
+  await db.Token.create({
+    userId: user.id,
     token: hashedToken,
-    createdAt: Date.now(),
+    // createdAt: Date.now(),
     expiresAt: Date.now() + 30 * (60 * 1000), // Thirty minutes
-  }).save();
+  });
 
   // Construct Reset Url
   const resetUrl = `${process.env.FRONTEND_URL}/resetpassword/${resetToken}`;
@@ -288,6 +311,9 @@ const resetPassword = asyncHandler(async (req, res) => {
   const { password } = req.body;
   const { resetToken } = req.params;
 
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(password, salt);
+
   // Hash token, then compare to Token in DB
   const hashedToken = crypto
     .createHash("sha256")
@@ -295,9 +321,13 @@ const resetPassword = asyncHandler(async (req, res) => {
     .digest("hex");
 
   // fIND tOKEN in DB
-  const userToken = await Token.findOne({
-    token: hashedToken,
-    expiresAt: { $gt: Date.now() },
+  const userToken = await db.Token.findOne({
+    where: {
+      token: hashedToken,
+      expiresAt: {
+        [Op.gt]: Date.now(),
+      },
+    }
   });
 
   if (!userToken) {
@@ -306,9 +336,14 @@ const resetPassword = asyncHandler(async (req, res) => {
   }
 
   // Find user
-  const user = await User.findOne({ _id: userToken.userId });
-  user.password = password;
-  await user.save();
+  const user = await db.User.findOne({ 
+    where : {id: userToken.userId}
+  });
+  
+  // user.password = password;
+  await user.update({
+    password : hashedPassword
+  });
   res.status(200).json({
     message: "Password Reset Successful, Please Login",
   });
