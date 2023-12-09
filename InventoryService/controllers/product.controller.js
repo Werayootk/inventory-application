@@ -1,7 +1,6 @@
 const asyncHandler = require("express-async-handler");
 const Product = require("../models/product.model");
 const { fileSizeFormatter } = require("../utils/fileUpload");
-const { Op } = require("sequelize");
 const db = require("../models");
 
 const cloudinary = require("cloudinary").v2;
